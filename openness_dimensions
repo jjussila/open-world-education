@@ -1,0 +1,142 @@
+import numpy as np
+import plotly.graph_objects as go
+
+# -----------------------------
+# Data
+# -----------------------------
+categories = ["Place of learning", "Progression structure", "Choice space of learning content and activities", "Guidance", "Normativity"]
+# values hardcoded
+bachelor = np.array([3, 2, 3, 2, 3], dtype=float)
+master   = np.array([5, 3, 5, 4, 3], dtype=float)
+
+# Normalize to 0..1
+bachelor = bachelor / 5.0
+master   = master / 5.0
+
+N = len(categories)
+base_angles = np.linspace(0, 2 * np.pi, N, endpoint=False)
+
+# -----------------------------
+# Build flower-like petals
+# -----------------------------
+def flower_curve(values, angles, points_per_petal=120):
+    """
+    Create a smooth 'petal' curve by drawing a cosine lobe around each axis.
+    Each petal peak equals the category value; it tapers smoothly toward neighbors.
+    """
+    width = 2 * np.pi / len(values)  # one category sector width
+    all_theta = []
+    all_r = []
+
+    for i, (a0, amp) in enumerate(zip(angles, values)):
+        t = np.linspace(a0 - width / 2, a0 + width / 2, points_per_petal, endpoint=False)
+        # Cosine bell: 0 at sector edges, 1 at sector center
+        x = (t - a0) / (width / 2)  # maps to [-1, 1]
+        lobe = 0.5 * (1 + np.cos(np.pi * x))  # maps to [0, 1]
+        r = amp * lobe
+
+        all_theta.append(t)
+        all_r.append(r)
+
+    theta = np.concatenate(all_theta)
+    r = np.concatenate(all_r)
+
+    # Close loop
+    theta = np.concatenate([theta, [theta[0]]])
+    r = np.concatenate([r, [r[0]]])
+
+    return theta, r
+
+theta_b, r_b = flower_curve(bachelor, base_angles)
+theta_m, r_m = flower_curve(master, base_angles)
+
+# -----------------------------
+# Plot
+# -----------------------------
+fig = go.Figure()
+
+# Optional subtle glow underlays
+fig.add_trace(go.Scatterpolar(
+    r=r_b, theta=np.degrees(theta_b),
+    fill='toself', mode='lines', line=dict(width=0),
+    fillcolor='rgba(70,130,180,0.10)', showlegend=False
+))
+fig.add_trace(go.Scatterpolar(
+    r=r_m, theta=np.degrees(theta_m),
+    fill='toself', mode='lines', line=dict(width=0),
+    fillcolor='rgba(220,20,60,0.10)', showlegend=False
+))
+
+# Main flower layers
+fig.add_trace(go.Scatterpolar(
+    r=r_b, theta=np.degrees(theta_b),
+    fill='toself',
+    name='Bachelor',
+    mode='lines',
+    line=dict(color='rgba(70,130,180,1)', width=2.5, shape='spline', smoothing=1.1),
+    fillcolor='rgba(70,130,180,0.30)'
+))
+fig.add_trace(go.Scatterpolar(
+    r=r_m, theta=np.degrees(theta_m),
+    fill='toself',
+    name='Master',
+    mode='lines',
+    line=dict(color='rgba(220,20,60,1)', width=2.5, shape='spline', smoothing=1.1),
+    fillcolor='rgba(220,20,60,0.30)'
+))
+
+# Axis markers (petal labels at outer ring)
+fig.add_trace(go.Scatterpolar(
+    r=[1.06] * N,
+    theta=np.degrees(base_angles),
+    mode='text',
+    text=categories,
+    textfont=dict(size=12, color='black'),
+    showlegend=False,
+    hoverinfo='skip'
+))
+
+fig.update_layout(
+    margin=dict(t=130, b=60, l=60, r=60),
+    polar=dict(
+        bgcolor='white',
+        radialaxis=dict(
+            range=[0, 1.08],
+            tickvals=[0.2, 0.4, 0.6, 0.8, 1.0],
+            ticktext=['1', '2', '3', '4', '5'],
+            tickfont=dict(size=10),
+            gridcolor='rgba(0,0,0,0.10)',
+            showline=False,
+            angle=90
+        ),
+        angularaxis=dict(
+            tickmode='array',
+            tickvals=np.degrees(base_angles),
+            ticktext=[''] * N,  # hide default labels (we added custom text)
+            gridcolor='rgba(0,0,0,0.07)',
+            rotation=90,
+            direction='clockwise'
+        )
+    ),
+    template='plotly_white',
+    title=dict(
+        text="Openness dimensions",
+        x=0.5,
+        xanchor='center',
+        font=dict(size=20)
+    ),
+    legend=dict(orientation='h', x=0.5, xanchor='center', y=1.1)
+)
+
+# Export as SVG (requires: pip install -U kaleido)
+output_path = "openness_comparison.svg"
+fig.write_image(
+    output_path,
+    format="svg",
+    width=900,
+    height=900,
+    scale=2,  # sharper lines/text when scaled
+)
+print(f"Saved: {output_path}")
+
+fig.show()
