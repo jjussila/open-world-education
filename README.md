@@ -1,2 +1,2 @@
 # open-world-education
-Open World Educaation
+Open World Education
